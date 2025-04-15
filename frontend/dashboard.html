@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Task Queue Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f4f6f9;
+            margin: 40px;
+            color: #333;
+        }
+
+        h1 {
+            color: #2c3e50;
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+
+        #queue-size {
+            font-weight: bold;
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            padding: 8px;
+            margin: 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 200px;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: #3498db;
+            border: none;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #fff;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background-color: #2c3e50;
+            color: white;
+        }
+
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+
+        .source-badge {
+            font-size: 0.85rem;
+            padding: 2px 6px;
+            background-color: #ddd;
+            border-radius: 4px;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 Task Queue Dashboard</h1>
+
+    <div id="queue-size">Loading queue size...</div>
+
+    <h2>➕ Submit New Task</h2>
+    <input type="text" id="task-id" placeholder="Task ID">
+    <input type="text" id="task-payload" placeholder="Task Payload">
+    <button onclick="submitTask()">Submit Task</button>
+    <br><br>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Task ID</th>
+                <th>Payload</th>
+                <th>Source</th>
+            </tr>
+        </thead>
+        <tbody id="task-table-body">
+        </tbody>
+    </table>
+
+    <script>
+        function updateDashboard() {
+            fetch("http://127.0.0.1:5000/queue_status")
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("queue-size").innerText = `Current queue size: ${data.queue_size}`;
+
+                    const tableBody = document.getElementById("task-table-body");
+                    tableBody.innerHTML = "";
+
+                    (data.tasks || []).forEach(task => {
+                        const row = document.createElement("tr");
+
+                        const idCell = document.createElement("td");
+                        idCell.textContent = task.id;
+                        row.appendChild(idCell);
+
+                        const payloadCell = document.createElement("td");
+                        payloadCell.textContent = task.payload;
+                        row.appendChild(payloadCell);
+
+                        const sourceCell = document.createElement("td");
+                        sourceCell.innerHTML = `<span class="source-badge">${task.location || "unknown"}</span>`;
+                        row.appendChild(sourceCell);
+
+                        tableBody.appendChild(row);
+                    });
+                })
+                .catch(err => {
+                    document.getElementById("queue-size").innerHTML = "Current queue size: <span class='error'>Error</span>";
+                    console.error("Error fetching queue status:", err);
+                });
+        }
+
+        function submitTask() {
+            const id = document.getElementById("task-id").value.trim();
+            const payload = document.getElementById("task-payload").value.trim();
+            if (!id || !payload) {
+                alert("Please provide both Task ID and Payload.");
+                return;
+            }
+
+            fetch("http://127.0.0.1:5000/submit_task", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    task: { id: id, payload: payload }
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                alert(data.message || data.error || "Submitted.");
+                updateDashboard();
+                document.getElementById("task-id").value = "";
+                document.getElementById("task-payload").value = "";
+            })
+            .catch(err => {
+                alert("❌ Failed to submit task.");
+                console.error(err);
+            });
+        }
+
+        setInterval(updateDashboard, 3000);
+        updateDashboard();
+    </script>
+</body>
+</html>

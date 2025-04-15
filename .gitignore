@@ -1,0 +1,22 @@
+# Python
+*.pyc
+*.pyo
+*.pyd
+__pycache__
+env/
+venv/
+# IDEs
+.vscode/
+.idea/
+# Flask/Django
+instance/
+*.db
+*.sqlite3
+# Redis/RabbitMQ
+*.log
+*.pid
+# Docker
+*.dockerfile
+docker-compose.override.yml
+*.swp
+*.swo

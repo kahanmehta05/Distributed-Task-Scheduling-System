@@ -1,0 +1,5 @@
+Flask==2.1.0
+redis==4.0.2
+pika==1.2.0   # For RabbitMQ
+pytest==7.0.0
+Werkzeug==2.1.2
