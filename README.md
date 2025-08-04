@@ -137,6 +137,181 @@ Visit: `http://localhost:9090/dashboard.html`
 - Load-based task distribution
 
 ---
+Detailed Explanation:
+---
+
+## 🧠 Project: Distributed Task Scheduler
+
+**Tech Stack:** Python, Flask, Redis, REST API, System Design, Fault Tolerance
+
+---
+
+## ✅ 1. Project Overview
+
+> I built a **Distributed Task Scheduler** system that enables clients to submit tasks via a REST API. These tasks are processed asynchronously by a pool of **worker nodes**, coordinated through **Redis** as a message broker. The system includes a **monitor node** that detects and recovers failed workers to ensure fault tolerance.
+
+---
+
+## ✅ 2. System Architecture
+
+### 👇 Components:
+
+| Component                     | Role                                                                                 |
+| ----------------------------- | ------------------------------------------------------------------------------------ |
+| **Flask API (api.py)**        | Accepts tasks via HTTP POST requests; pushes them to Redis `task_queue`              |
+| **Redis**                     | Acts as a task broker and storage for task queues, processing queues, and heartbeats |
+| **Worker Nodes (worker.py)**  | Pull tasks from Redis, process them, send heartbeats                                 |
+| **Monitor Node (monitor.py)** | Detects failed workers via heartbeat timeout and requeues their tasks                |
+
+---
+
+## ✅ 3. Task Lifecycle (End-to-End Flow)
+
+### 1️⃣ Task Submission
+
+* A client sends a POST request to the `/submit-task` endpoint.
+* The Flask server receives the task, validates it, and `LPUSH`es it to the global Redis `task_queue`.
+
+```python
+@app.route('/submit-task', methods=['POST'])
+def submit():
+    redis.lpush("task_queue", json.dumps(task_data))
+    return {"status": "queued"}
+```
+
+---
+
+### 2️⃣ Task Dispatching (Worker)
+
+* Each worker runs in a loop using Redis's **`BRPOPLPUSH`**:
+
+```python
+task = redis.brpoplpush("task_queue", f"processing:{worker_id}", timeout=5)
+```
+
+* This **atomically**:
+
+  * Removes a task from the end of `task_queue`
+  * Pushes it to the front of `processing:<worker_id>` queue
+* This ensures **task safety** — if a worker dies mid-task, the task isn’t lost.
+
+---
+
+### 3️⃣ Task Processing
+
+* The worker processes the task (e.g., sleeps, simulates compute).
+* While processing, it sends **heartbeats** to Redis:
+
+```python
+redis.setex(f"heartbeat:{worker_id}", 10, "alive")
+```
+
+* This TTL-based heartbeat allows the monitor to track liveness.
+
+---
+
+### 4️⃣ Task Completion
+
+* After successful processing, the worker removes the task from its `processing:` queue:
+
+```python
+redis.lrem(f"processing:{worker_id}", 1, task)
+```
+
+---
+
+### 5️⃣ Failure Detection and Recovery (Monitor)
+
+* The monitor checks each worker’s heartbeat every few seconds:
+
+```python
+if not redis.exists(f"heartbeat:{worker_id}"):
+    # Worker is dead
+```
+
+* If dead, it:
+
+  * Reads the task from `processing:<worker_id>`
+  * Re-queues it to `task_queue` for another worker
+
+```python
+task = redis.lindex(f"processing:{dead_worker}", 0)
+redis.lpush("task_queue", task)
+```
+
+---
+
+## ✅ 4. System Design Principles Applied
+
+| Principle                   | Implementation                                               |
+| --------------------------- | ------------------------------------------------------------ |
+| **Asynchronous Processing** | Task submission and execution are decoupled                  |
+| **Scalability**             | Add more workers for load — pull-based scaling               |
+| **Fault Tolerance**         | Heartbeat + monitor enables failure detection and requeueing |
+| **Atomicity**               | `BRPOPLPUSH` ensures atomic task assignment                  |
+| **Stateless API**           | Flask API is stateless, easy to scale                        |
+| **Decoupling**              | API, workers, and monitor communicate only via Redis         |
+
+---
+
+## ✅ 5. Redis Data Structures Used
+
+| Redis Key                | Purpose                                |
+| ------------------------ | -------------------------------------- |
+| `task_queue`             | Global queue of pending tasks          |
+| `processing:<worker_id>` | In-progress task of a specific worker  |
+| `heartbeat:<worker_id>`  | Last known liveness signal from worker |
+| (optional) `task:<id>`   | Metadata or results of tasks           |
+
+---
+
+## ✅ 6. Why Flask REST API?
+
+* Flask provides a **lightweight and fast** REST interface.
+* It cleanly separates the **task submission** logic from the **processing**.
+* REST keeps it stateless, which means the server doesn’t need to maintain sessions.
+
+---
+
+## ✅ 7. Fault Tolerance in Detail
+
+* Each worker **sends heartbeats** to Redis using `setex()`.
+* If the monitor **misses a heartbeat**, it:
+
+  * Assumes the worker is dead.
+  * Checks the `processing:` queue for that worker.
+  * Re-pushes the task back into `task_queue`.
+
+This gives you **at-least-once delivery guarantee** — i.e., no task is lost.
+
+---
+
+## ✅ 8. Load Balancing
+
+* Workers **pull** from the queue using `BRPOPLPUSH`.
+* This creates **natural load balancing** — the free worker grabs the next task.
+* There is **no need for master to assign tasks manually**.
+
+---
+
+## ✅ 9. What Could Be Improved or Extended?
+
+| Feature             | How to Add                                        |
+| ------------------- | ------------------------------------------------- |
+| Task Prioritization | Use separate Redis queues per priority            |
+| Retry Mechanism     | Push failed tasks to a `retry_queue`              |
+| Result Storage      | Store results in Redis or DB keyed by task ID     |
+| Web UI              | To monitor queue size, task status, worker health |
+| Docker/K8s          | Containerize workers and scale on-demand          |
+
+---
+
+## ✅ 10. What is Learned
+
+> “This project gave me a deep understanding of backend architecture, message brokers, and distributed system design.
+> I designed fault detection, atomic queueing, and stateless APIs — concepts similar to what systems like Celery, RabbitMQ, and AWS SQS use internally.”
+
+
 
 ## 🤖 Future Enhancements
 
