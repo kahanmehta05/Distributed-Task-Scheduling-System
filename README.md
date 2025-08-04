@@ -11,7 +11,7 @@ A scalable, fault-tolerant, and concurrent task execution system built using **P
 - ⚖️ **Load Balancing** – Tasks are assigned to the least loaded active worker using Redis queues.
 - 🔍 **Real-Time Dashboard** – Web interface to submit and monitor tasks across queues and workers.
 - 📦 **Queue Architecture** – Uses a dual-queue setup: a `task_queue` for pending tasks and `processing:*` queues per worker.
-- 🧠 **Monitor Node** – Requeues stuck tasks from failed workers.
+- 🧠 **Monitor Node** – Requeues stuck tasks from failed workers to the back of the task queue so that it gets popped earliest.
 
 ---
 
